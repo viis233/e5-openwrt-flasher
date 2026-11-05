@@ -1,0 +1,50 @@
+#!/bin/sh
+# e5 preconfig: apply the customization checklist at first boot.
+# LAN / WiFi / OpenSSH / ZeroTier / power-save are preset here; secrets
+# (__WIFI_KEY__, __ZT_NETWORK__, __ROOT_PASSWORD__) are injected at build
+# time by build/apply-preconfig.sh from the builder's local secrets file
+# (never committed).  OpenClash/ZeroTier/iStore apps are preinstalled in
+# the image; their uci defaults are set below where available.
+set -e
+
+# ---- LAN (10.0.55.1 single address, DHCP 10/191, USB host .2) ----
+uci -q delete network.lan.ipaddr
+uci add_list network.lan.ipaddr='10.0.55.1/24'
+uci -q set dhcp.lan.start='10'
+uci -q set dhcp.lan.limit='191'
+uci -q set dhcp.usb_host.ip='10.0.55.2'
+uci commit network
+uci commit dhcp
+
+# ---- WiFi hotspot (WingZaiNetwork-e5, ch149 VHT80, psk2+ccmp) ----
+uci -q set wireless.default_radio0.ssid='WingZaiNetwork-e5'
+uci -q set wireless.default_radio0.encryption='psk2+ccmp'
+uci -q set wireless.default_radio0.key='__WIFI_KEY__'
+uci -q set wireless.radio0.channel='149'
+uci -q set wireless.radio0.htmode='VHT80'
+uci -q set wireless.radio0.disabled='0'
+uci commit wireless
+
+# ---- OpenSSH: sshd on 22 (PermitRootLogin yes, PasswordAuthentication yes), dropbear off ----
+uci -q set dropbear.@dropbear[0].enable='0'
+uci commit dropbear
+sed -i 's/^#\?PermitRootLogin .*/PermitRootLogin yes/' /etc/ssh/sshd_config
+sed -i 's/^#\?PasswordAuthentication .*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+grep -q '^Port 22$' /etc/ssh/sshd_config || sed -i 's/^#\?Port .*/Port 22/' /etc/ssh/sshd_config
+/etc/init.d/dropbear disable
+/etc/init.d/sshd enable 2>/dev/null || true
+
+# ---- root password (secret, injected at build time) ----
+echo "root:__ROOT_PASSWORD__" | chpasswd
+
+# ---- ZeroTier network ----
+uci -q set zerotier.earth.id='__ZT_NETWORK__'
+uci -q set zerotier.global.enabled='1'
+uci commit zerotier
+/etc/init.d/zerotier enable
+
+# ---- power save: hotspotdata defaults on; keep autooff's fence manual by default ----
+uci -q set e5-plugin-hotspotdata.settings.enabled='1'
+uci commit e5-plugin-hotspotdata 2>/dev/null || true
+
+exit 0
