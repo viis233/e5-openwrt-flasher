@@ -43,10 +43,9 @@ uci -q set zerotier.global.enabled='1'
 uci commit zerotier
 /etc/init.d/zerotier enable
 
-# ---- OpenClash（预装）：启用 + 指向注入的订阅 ----
+# ---- OpenClash（预装）：启用 + 指向注入的订阅；dashboard 密码由 OpenClash 首次运行自动生成 ----
 uci -q set openclash.config.enable='1'
 uci -q set openclash.config.config_path='/etc/openclash/config/liangxin.yaml'
-uci -q set openclash.config.dashboard_password='__DASHBOARD_PASSWORD__'
 uci commit openclash 2>/dev/null || true
 
 # ---- power save: hotspotdata defaults on; keep autooff's fence manual by default ----
